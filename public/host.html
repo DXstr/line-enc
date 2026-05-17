@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decode the Signal — HOST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#020a0f; --surface:#041420; --border:#0d4a6e;
+    --accent:#00ffe7; --accent2:#ff6b35; --warn:#ffd700;
+    --text:#c8e8f0; --dim:#4a7a8a;
+    --glow:0 0 20px rgba(0,255,231,0.5);
+    --green:#39ff14;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;min-height:100vh;}
+  body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,255,231,0.012) 3px,rgba(0,255,231,0.012) 4px);pointer-events:none;z-index:999;}
+  body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,231,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,231,0.03) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0;}
+
+  /* ── PHASE 1: QR LANDING ── */
+  #ph1{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center;gap:28px;padding:40px;}
+  .big-title{font-family:'Orbitron',sans-serif;font-size:clamp(40px,8vw,90px);font-weight:900;color:var(--accent);text-shadow:var(--glow),0 0 60px rgba(0,255,231,0.3);letter-spacing:4px;line-height:1.05;}
+  .big-title span{color:var(--accent2);text-shadow:0 0 20px rgba(255,107,53,0.5),0 0 60px rgba(255,107,53,0.3);}
+  .sub{font-size:clamp(13px,2.5vw,18px);color:var(--dim);letter-spacing:4px;text-transform:uppercase;}
+  .qr-frame{background:white;border-radius:16px;padding:20px;box-shadow:0 0 60px rgba(0,255,231,0.3);}
+  .qr-frame canvas{display:block;}
+  .url-pill{background:rgba(0,255,231,0.06);border:1px solid var(--border);border-radius:8px;padding:10px 24px;font-size:clamp(13px,2vw,17px);color:var(--accent);letter-spacing:2px;}
+  .start-btn{background:rgba(0,255,231,0.1);border:2px solid var(--accent);border-radius:12px;padding:18px 56px;font-family:'Orbitron',sans-serif;font-size:clamp(14px,2.5vw,20px);font-weight:700;letter-spacing:4px;color:var(--accent);cursor:pointer;text-transform:uppercase;transition:all 0.2s;text-shadow:var(--glow);}
+  .start-btn:hover{background:rgba(0,255,231,0.22);transform:translateY(-2px);}
+
+  /* ── PHASE 2: CHALLENGE ── */
+  #ph2{display:none;position:relative;z-index:1;padding:32px;}
+  .host-grid{display:grid;grid-template-columns:1fr 360px;gap:28px;max-width:1400px;margin:0 auto;}
+  @media(max-width:900px){.host-grid{grid-template-columns:1fr;}}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;position:relative;overflow:hidden;}
+  .panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);}
+  .panel-title{font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:4px;color:var(--dim);text-transform:uppercase;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+
+  /* countdown */
+  .bar-bg{background:rgba(13,74,110,0.3);border-radius:4px;height:8px;overflow:hidden;margin-bottom:10px;}
+  .bar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width 1s linear,background 0.3s;box-shadow:0 0 10px var(--accent);width:100%;}
+  .count-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;}
+  .count-big{font-family:'Orbitron',sans-serif;font-size:52px;font-weight:900;color:var(--accent);text-shadow:var(--glow);line-height:1;}
+  .count-lbl{font-size:11px;color:var(--dim);letter-spacing:2px;}
+  .sub-count{font-family:'Orbitron',sans-serif;font-size:26px;color:var(--warn);text-align:right;}
+
+  .ctrl-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:0;}
+  .cbtn{background:rgba(0,255,231,0.08);border:1px solid rgba(0,255,231,0.35);border-radius:6px;padding:8px 18px;font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:2px;color:var(--accent);cursor:pointer;transition:all 0.2s;}
+  .cbtn:hover{background:rgba(0,255,231,0.18);}
+  .cbtn.red{background:rgba(255,107,53,0.08);border-color:rgba(255,107,53,0.35);color:var(--accent2);}
+  .cbtn.red:hover{background:rgba(255,107,53,0.18);}
+
+  /* waveform */
+  .wf-host{background:#010d14;border:1px solid var(--border);border-radius:8px;padding:14px 12px 10px;margin-bottom:16px;}
+  canvas{display:block;width:100%;}
+
+  /* bit cells */
+  .bits-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+  .bit-cell{background:rgba(13,74,110,0.15);border:1px solid var(--border);border-radius:8px;padding:12px 8px;text-align:center;transition:all 0.4s ease;opacity:0.35;}
+  .bit-cell.on{opacity:1;background:rgba(0,255,231,0.08);border-color:var(--accent);box-shadow:0 0 14px rgba(0,255,231,0.15);}
+  .bit-cell .bc-label{font-size:10px;color:var(--dim);letter-spacing:1px;margin-bottom:6px;}
+  .bit-cell .bc-val{font-family:'Orbitron',sans-serif;font-size:28px;font-weight:700;color:var(--accent);text-shadow:var(--glow);}
+  .bit-cell .bc-v{font-size:11px;color:var(--dim);margin-top:4px;}
+
+  /* result */
+  .result-row{display:flex;align-items:center;gap:16px;background:rgba(0,255,231,0.04);border:1px solid var(--border);border-radius:8px;padding:16px 20px;opacity:0;transition:opacity 0.6s;}
+  .result-row.show{opacity:1;}
+  .res-bin{font-family:'Orbitron',sans-serif;font-size:clamp(14px,2vw,20px);color:var(--dim);letter-spacing:3px;}
+  .res-arrow{font-size:24px;color:var(--accent);}
+  .res-dec-wrap{flex:1;}
+  .res-dec-lbl{font-size:11px;color:var(--dim);letter-spacing:2px;margin-bottom:4px;}
+  .res-dec{font-family:'Orbitron',sans-serif;font-size:clamp(28px,5vw,56px);font-weight:900;color:var(--warn);text-shadow:0 0 30px var(--warn),0 0 60px rgba(255,215,0,0.3);letter-spacing:6px;}
+
+  /* leaderboard */
+  .lb-entries{display:flex;flex-direction:column;gap:8px;}
+  .lb-row{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:8px;padding:12px 14px;animation:slr 0.4s ease;}
+  @keyframes slr{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+  .lb-row.win{border-color:var(--warn);background:rgba(255,215,0,0.05);}
+  .lb-medal{font-size:22px;width:28px;text-align:center;}
+  .lb-info{flex:1;}
+  .lb-n{font-size:14px;color:var(--text);}
+  .lb-t{font-size:11px;color:var(--dim);margin-top:2px;letter-spacing:1px;}
+  .lb-badge{background:rgba(57,255,20,0.12);border:1px solid var(--green);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--green);letter-spacing:2px;}
+  .lb-empty-h{color:var(--dim);font-size:13px;text-align:center;padding:20px;letter-spacing:2px;}
+  .refresh-note{font-size:11px;color:var(--dim);text-align:center;margin-top:10px;letter-spacing:1px;}
+
+  /* ── PHASE 3: WINNERS ── */
+  #ph3{display:none;position:relative;z-index:1;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:60px 40px;text-align:center;gap:36px;}
+  .win-title{font-family:'Orbitron',sans-serif;font-size:clamp(36px,7vw,80px);font-weight:900;color:var(--warn);text-shadow:0 0 40px var(--warn),0 0 80px rgba(255,215,0,0.4);letter-spacing:4px;}
+  .win-grid{display:flex;gap:28px;flex-wrap:wrap;justify-content:center;}
+  .win-card{background:rgba(255,215,0,0.06);border:2px solid var(--warn);border-radius:16px;padding:30px 36px;text-align:center;box-shadow:0 0 40px rgba(255,215,0,0.2);animation:pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;min-width:180px;}
+  .win-card:nth-child(1){animation-delay:0.2s;}
+  .win-card:nth-child(2){animation-delay:0.5s;}
+  .win-card:nth-child(3){animation-delay:0.8s;}
+  @keyframes pop{from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:scale(1)}}
+  .win-medal{font-size:56px;margin-bottom:10px;}
+  .win-name{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:700;color:var(--text);}
+  .win-time{font-size:12px;color:var(--dim);margin-top:6px;letter-spacing:2px;}
+</style>
+</head>
+<body>
+
+<!-- PHASE 1: QR -->
+<div id="ph1">
+  <div>
+    <div style="font-size:11px;letter-spacing:6px;color:var(--dim);margin-bottom:10px;">// NETWORKING — LIVE CHALLENGE</div>
+    <div class="big-title">DECODE<br><span>THE SIGNAL</span></div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:36px;">
+    <div class="qr-frame"><canvas id="qrCvs" width="220" height="220"></canvas></div>
+    <div class="url-pill" id="urlPill">your-app.vercel.app</div>
+  </div>
+  <div class="sub">Scan → read the waveform → type the binary</div>
+  <button class="start-btn" onclick="go()">▶ START CHALLENGE</button>
+</div>
+
+<!-- PHASE 2: CHALLENGE -->
+<div id="ph2">
+  <div class="host-grid">
+
+    <!-- LEFT -->
+    <div style="display:flex;flex-direction:column;gap:24px;">
+
+      <div class="panel">
+        <div class="panel-title">// Challenge Control</div>
+        <div class="bar-bg"><div class="bar-fill" id="barFill"></div></div>
+        <div class="count-row">
+          <div>
+            <div class="count-big" id="hostTimer">60</div>
+            <div class="count-lbl">SECONDS LEFT</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="sub-count" id="subCount">0</div>
+            <div class="count-lbl">SUBMISSIONS</div>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <button class="cbtn" onclick="reveal()">▶ REVEAL ANSWER</button>
+          <button class="cbtn" onclick="showWin()">🏆 SHOW WINNERS</button>
+          <button class="cbtn red" onclick="resetData()">⟳ RESET</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">// NRZ Waveform Decode — Answer Reveal</div>
+        <div class="wf-host"><canvas id="wfHost" height="110"></canvas></div>
+        <div style="font-size:11px;color:var(--dim);letter-spacing:2px;margin-bottom:14px;">ENCODING: NRZ &nbsp;|&nbsp; RULE: HIGH = 1, LOW = 0 &nbsp;|&nbsp; ANSWER: <span style="color:var(--warn);">1011</span></div>
+
+        <div class="bits-row" id="bitsRow">
+          <div class="bit-cell" id="bc0"><div class="bc-label">BIT 1</div><div class="bc-val">1</div><div class="bc-v">HIGH</div></div>
+          <div class="bit-cell" id="bc1"><div class="bc-label">BIT 2</div><div class="bc-val">0</div><div class="bc-v">LOW</div></div>
+          <div class="bit-cell" id="bc2"><div class="bc-label">BIT 3</div><div class="bc-val">1</div><div class="bc-v">HIGH</div></div>
+          <div class="bit-cell" id="bc3"><div class="bc-label">BIT 4</div><div class="bc-val">1</div><div class="bc-v">HIGH</div></div>
+        </div>
+
+        <div class="result-row" id="resultRow">
+          <div class="res-bin">1011</div>
+          <div class="res-arrow">→</div>
+          <div class="res-dec-wrap">
+            <div class="res-dec-lbl">BINARY → DECIMAL</div>
+            <div class="res-dec">11</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT -->
+    <div>
+      <div class="panel" style="position:sticky;top:24px;">
+        <div class="panel-title">// Live Leaderboard</div>
+        <div class="lb-entries" id="hostLb">
+          <div class="lb-empty-h">Waiting for submissions…</div>
+        </div>
+        <div class="refresh-note">Auto-refreshes every 3 s</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PHASE 3: WINNERS -->
+<div id="ph3">
+  <div class="win-title">🏆 WINNERS 🏆</div>
+  <div style="font-family:Orbitron,sans-serif;font-size:17px;color:var(--accent);letter-spacing:4px;text-shadow:var(--glow);">THE SIGNAL HAS BEEN DECODED</div>
+  <div style="font-family:Orbitron,sans-serif;font-size:22px;color:var(--dim);letter-spacing:4px;">ANSWER: <span style="color:var(--warn);">1011</span> = <span style="color:var(--accent);">11</span></div>
+  <div class="win-grid" id="winGrid"></div>
+  <button class="start-btn" onclick="location.reload()">↩ RESTART</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const BITS = [1,0,1,1];
+const STORAGE_KEY = 'dtg_v2';
+const DURATION = 60;
+
+// ── QR CODE ──────────────────────────────────
+function buildQR(){
+  const url = window.location.origin + '/';
+  document.getElementById('urlPill').textContent = url.replace(/^https?:\/\//,'');
+
+  const div = document.createElement('div');
+  div.style.display='none';
+  document.body.appendChild(div);
+  new QRCode(div,{text:url,width:220,height:220,correctLevel:QRCode.CorrectLevel.M});
+
+  setTimeout(()=>{
+    const src = div.querySelector('canvas');
+    if(src){
+      const ctx = document.getElementById('qrCvs').getContext('2d');
+      ctx.fillStyle='white'; ctx.fillRect(0,0,220,220);
+      const img = new Image();
+      img.onload = ()=>ctx.drawImage(img,0,0,220,220);
+      img.src = src.toDataURL();
+    }
+    document.body.removeChild(div);
+  }, 150);
+}
+
+// ── WAVEFORM ─────────────────────────────────
+function drawWF(canvasId, litUpTo){
+  const cvs = document.getElementById(canvasId);
+  if(!cvs) return;
+  const W = cvs.offsetWidth || 700;
+  cvs.width = W; cvs.height = 110;
+  const ctx = cvs.getContext('2d');
+  const bw = W/BITS.length;
+  const HIGH=15, LOW=78;
+
+  ctx.clearRect(0,0,W,110);
+  ctx.fillStyle='#010d14'; ctx.fillRect(0,0,W,110);
+
+  // highlight revealed bits
+  if(litUpTo >= 0){
+    ctx.fillStyle='rgba(0,255,231,0.06)';
+    for(let i=0;i<=litUpTo;i++) ctx.fillRect(i*bw,0,bw,110);
+  }
+
+  ctx.strokeStyle='rgba(13,74,110,0.5)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  for(let i=1;i<BITS.length;i++){ ctx.beginPath(); ctx.moveTo(i*bw,0); ctx.lineTo(i*bw,110); ctx.stroke(); }
+  ctx.beginPath(); ctx.moveTo(0,46); ctx.lineTo(W,46); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle='rgba(0,255,231,0.4)'; ctx.font='11px Share Tech Mono';
+  ctx.fillText('+V',4,HIGH+12); ctx.fillText('  0',4,LOW+4);
+  ctx.fillStyle='rgba(74,122,138,0.9)'; ctx.font='bold 13px Share Tech Mono';
+  for(let i=0;i<BITS.length;i++) ctx.fillText('b'+(i+1), i*bw+bw/2-8, 106);
+
+  ctx.strokeStyle='#2563eb'; ctx.lineWidth=3; ctx.lineJoin='round';
+  ctx.shadowColor='#2563eb'; ctx.shadowBlur=6;
+  ctx.beginPath();
+  for(let i=0;i<BITS.length;i++){
+    const x=i*bw, y=BITS[i]===1?HIGH:LOW;
+    if(i===0){ ctx.moveTo(x,y); }
+    else { const py=BITS[i-1]===1?HIGH:LOW; if(py!==y){ctx.lineTo(x,py);ctx.lineTo(x,y);} }
+    ctx.lineTo(x+bw,y);
+  }
+  ctx.stroke(); ctx.shadowBlur=0;
+}
+
+// ── TIMER ────────────────────────────────────
+let timeLeft = DURATION;
+let ticker;
+
+function go(){
+  document.getElementById('ph1').style.display='none';
+  document.getElementById('ph2').style.display='block';
+  drawWF('wfHost',-1);
+  updateLB();
+
+  ticker = setInterval(()=>{
+    timeLeft--;
+    document.getElementById('hostTimer').textContent = timeLeft;
+    document.getElementById('barFill').style.width = (timeLeft/DURATION*100)+'%';
+    if(timeLeft<=10){
+      document.getElementById('barFill').style.background='var(--accent2)';
+      document.getElementById('hostTimer').style.color='var(--accent2)';
+    }
+    if(timeLeft<=0){ clearInterval(ticker); reveal(); }
+    updateLB();
+  },1000);
+}
+
+// ── REVEAL ───────────────────────────────────
+let revealDone=false, revStep=0, revInt;
+
+function reveal(){
+  if(revealDone) return;
+  revealDone=true;
+  clearInterval(ticker);
+  revInt = setInterval(()=>{
+    document.getElementById('bc'+revStep).classList.add('on');
+    drawWF('wfHost', revStep);
+    revStep++;
+    if(revStep>=BITS.length){
+      clearInterval(revInt);
+      setTimeout(()=>document.getElementById('resultRow').classList.add('show'),400);
+    }
+  },500);
+}
+
+// ── LEADERBOARD ──────────────────────────────
+function getSubs(){ try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[];}catch(e){return[];} }
+const medals=['🥇','🥈','🥉'];
+const ranks=['1ST','2ND','3RD'];
+
+function updateLB(){
+  const all = getSubs();
+  const correct = all.filter(s=>s.correct);
+  document.getElementById('subCount').textContent = all.length;
+  const el = document.getElementById('hostLb');
+  if(!correct.length){ el.innerHTML='<div class="lb-empty-h">No correct answers yet…</div>'; return; }
+  el.innerHTML = correct.slice(0,3).map((w,i)=>`
+    <div class="lb-row win">
+      <div class="lb-medal">${medals[i]}</div>
+      <div class="lb-info"><div class="lb-n">${esc(w.name)}</div><div class="lb-t">${w.timeStr}</div></div>
+      <div class="lb-badge">${ranks[i]}</div>
+    </div>`).join('') +
+    (all.filter(s=>!s.correct).length ? `<div style="font-size:11px;color:var(--dim);text-align:center;margin-top:8px;">${all.filter(s=>!s.correct).length} incorrect attempt(s)</div>` : '');
+}
+
+function showWin(){
+  clearInterval(ticker);
+  document.getElementById('ph2').style.display='none';
+  const ph3 = document.getElementById('ph3');
+  ph3.style.display='flex';
+  const winners = getSubs().filter(s=>s.correct).slice(0,3);
+  const grid = document.getElementById('winGrid');
+  if(!winners.length){ grid.innerHTML='<div style="color:var(--dim);font-size:15px;letter-spacing:2px;">No correct submissions</div>'; return; }
+  grid.innerHTML = winners.map((w,i)=>`
+    <div class="win-card">
+      <div class="win-medal">${medals[i]}</div>
+      <div class="win-name">${esc(w.name)}</div>
+      <div class="win-time">${w.timeStr}</div>
+    </div>`).join('');
+}
+
+function resetData(){
+  if(confirm('Clear all submission data?')){ localStorage.removeItem(STORAGE_KEY); updateLB(); }
+}
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+setInterval(updateLB, 3000);
+window.addEventListener('load', buildQR);
+window.addEventListener('resize', ()=>{ if(document.getElementById('ph2').style.display==='block') drawWF('wfHost',-1); });
+</script>
+</body>
+</html>
